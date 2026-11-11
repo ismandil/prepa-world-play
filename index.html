@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#101420">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>Prepa World</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #101420; touch-action: none; }
+    #unity-canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; background: #101420; }
+    #start { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+             background: linear-gradient(160deg, #1d2a4a, #4a2448); color: #fff; font-family: system-ui, sans-serif; z-index: 10; }
+    #start h1 { margin: 0 0 8px; font-size: 34px; letter-spacing: 1px; }
+    #start p { margin: 0 0 28px; opacity: 0.8; }
+    #start button { font-size: 22px; font-weight: 700; padding: 16px 40px; border: 0; border-radius: 40px;
+                    background: #ff6fa0; color: #fff; box-shadow: 0 6px 20px rgba(0,0,0,0.35); }
+    #bar { width: 60%; max-width: 360px; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.2); margin-top: 26px; overflow: hidden; }
+    #fill { width: 0; height: 100%; background: #ff6fa0; transition: width 0.2s; }
+    #rotate { display: none; position: fixed; inset: 0; z-index: 20; background: #101420; color: #fff;
+              font-family: system-ui, sans-serif; align-items: center; justify-content: center; text-align: center; font-size: 20px; }
+    @media (orientation: portrait) and (max-width: 900px) { body.playing #rotate { display: flex; } }
+    #fs { display: none; position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 30;
+          font: 700 15px system-ui, sans-serif; color: #fff; background: rgba(255,111,160,0.9); border: 0;
+          border-radius: 20px; padding: 9px 18px; box-shadow: 0 3px 10px rgba(0,0,0,0.35); }
+    body.playing:not(.full) #fs { display: block; }
+  </style>
+</head>
+<body>
+  <canvas id="unity-canvas" tabindex="-1"></canvas>
+  <div id="start">
+    <h1>Prepa World</h1>
+    <p>Best in landscape, full screen</p>
+    <button id="play">TAP TO PLAY</button>
+    <div id="bar"><div id="fill"></div></div>
+  </div>
+  <div id="rotate">Turn your phone sideways ↻</div>
+  <button id="fs">⛶ FULL SCREEN</button>
+  <script>
+    // Plein écran et paysage : le navigateur ne l'autorise qu'après un geste de l'utilisateur.
+    function goFullscreen() {
+      var el = document.documentElement;
+      var request = el.requestFullscreen || el.webkitRequestFullscreen;
+      var done = request ? request.call(el, { navigationUI: "hide" }) : null;
+      Promise.resolve(done).catch(function () {}).then(function () {
+        if (screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock("landscape").catch(function () {});
+        }
+      });
+    }
+
+    var started = false;
+    document.getElementById("play").addEventListener("click", function () {
+      goFullscreen();
+      if (started) { return; }
+      started = true;
+      document.getElementById("play").textContent = "LOADING…";
+      var script = document.createElement("script");
+      script.src = "Build/WebGL.loader.js";
+      script.onload = function () {
+        createUnityInstance(document.getElementById("unity-canvas"), {
+          dataUrl: "Build/WebGL.data.unityweb",
+          frameworkUrl: "Build/WebGL.framework.js.unityweb",
+          codeUrl: "Build/WebGL.wasm.unityweb",
+          streamingAssetsUrl: "StreamingAssets",
+          companyName: "Ismail",
+          productName: "Prepa World",
+          productVersion: "0.1.0",
+          matchWebGLToCanvasSize: true,
+          devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2)
+        }, function (progress) {
+          document.getElementById("fill").style.width = Math.round(progress * 100) + "%";
+        }).then(function () {
+          document.getElementById("start").style.display = "none";
+          document.body.classList.add("playing");
+        }).catch(function (message) {
+          alert(message);
+        });
+      };
+      document.body.appendChild(script);
+    });
+
+    // Si le plein écran se perd (retour, changement d'appli), un toucher le remet.
+    document.addEventListener("touchend", function () {
+      if (started && !document.fullscreenElement && !document.webkitFullscreenElement) {
+        goFullscreen();
+      }
+    }, { passive: true });
+
+    // Bouton plein écran : visible tant qu'on n'est pas en plein écran.
+    document.getElementById("fs").addEventListener("click", goFullscreen);
+    function onFullscreenChange() {
+      var full = !!(document.fullscreenElement || document.webkitFullscreenElement)
+                 || window.matchMedia("(display-mode: fullscreen)").matches;
+      document.body.classList.toggle("full", full);
+    }
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", onFullscreenChange);
+    onFullscreenChange();
+
+    // Le geste « retour » ne quitte plus le jeu : il reste sur la page.
+    history.pushState({ prepa: 1 }, "");
+    window.addEventListener("popstate", function () {
+      history.pushState({ prepa: 1 }, "");
+    });
+    window.addEventListener("beforeunload", function (e) {
+      if (started) { e.preventDefault(); e.returnValue = ""; }
+    });
+  </script>
+</body>
+</html>
